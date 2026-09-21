@@ -1,0 +1,50 @@
+name: Build Nori APK
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Java 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: gradle
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: v364-connect/package-lock.json
+
+      - name: Install web dependencies
+        working-directory: v364-connect
+        run: npm install
+
+      - name: Sync Capacitor Android
+        working-directory: v364-connect
+        run: npx cap sync android
+
+      - name: Build debug APK
+        working-directory: v364-connect/android
+        run: ./gradlew assembleDebug --no-daemon --stacktrace
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: nori-debug-apk
+          path: v364-connect/android/app/build/outputs/apk/debug/*.apk
