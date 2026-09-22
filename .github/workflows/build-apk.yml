@@ -88,15 +88,12 @@ jobs:
             exit 1
           fi
           mkdir -p "$DST"
-          while IFS= read -r -d '' file; do
-            rel=$(printf '%s' "$file" | sed "s#^$SRC/##")
-            target="$DST/$rel"
-            if [ ! -f "$target" ]; then
-              mkdir -p "$(dirname "$target")"
-              cp "$file" "$target"
-              echo "RESTORED $rel"
-            fi
-          done < <(find "$SRC" -type f -name '*.java' -print0)
+          # The hardened package is the more complete V36.5 native source set.
+          # Replace matching Java sources, and add any sources missing from the build-script package.
+          # This keeps related classes/interfaces in the same V36.5 generation instead of
+          # mixing incompatible native-source revisions.
+          cp -a "$SRC/." "$DST/"
+          echo "Restored the complete hardened V36.5 Java source tree."
           echo "Native Java source inventory:"
           find "$DST" -type f -name '*.java' | sort | sed -n '1,250p'
 
