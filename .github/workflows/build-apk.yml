@@ -23,12 +23,9 @@ jobs:
           mkdir -p .nori-v36
           unzip -q "nori-v36_5-build-script-fixed.zip" -d .nori-v36
           PROJECT_DIR="$(find .nori-v36 -type d -name 'v364-connect' -print -quit)"
-          if [ -z "$PROJECT_DIR" ]; then
-            echo "Could not find v364-connect inside the V36.5 ZIP."
-            exit 1
-          fi
+          test -n "$PROJECT_DIR"
           echo "PROJECT_DIR=$PROJECT_DIR" >> "$GITHUB_ENV"
-          echo "Found Nori project at: $PROJECT_DIR"
+          echo "Found: $PROJECT_DIR"
 
       - name: Set up Java 21
         uses: actions/setup-java@v5
@@ -40,111 +37,109 @@ jobs:
         shell: bash
         run: |
           set -e
-          SDKMANAGER="${ANDROID_HOME}/cmdline-tools/latest/bin/sdkmanager"
-          if [ ! -x "$SDKMANAGER" ]; then
-            SDKMANAGER="${ANDROID_HOME}/cmdline-tools/16.0/bin/sdkmanager"
-          fi
+          SDKMANAGER="$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager"
+          if [ ! -x "$SDKMANAGER" ]; then SDKMANAGER="$ANDROID_HOME/cmdline-tools/16.0/bin/sdkmanager"; fi
           yes | "$SDKMANAGER" --licenses >/dev/null || true
-          "$SDKMANAGER" "platform-tools"
-          echo "Android SDK prepared."
+          "$SDKMANAGER" platform-tools
 
       - name: Set up Node
         uses: actions/setup-node@v5
         with:
           node-version: '22'
 
-      - name: Repair V36.5 Java source compatibility
+      - name: Repair V36.5 native source mismatches
         shell: bash
         run: |
           set -e
           cd "$PROJECT_DIR"
-          JAVA="android/app/src/main/java"
+          python3 <<'PY'
+          from pathlib import Path
+          import re
 
-          # npm compatibility
-          sed -i 's/"@capacitor-community\/speech-recognition": "8\.0\.0"/"@capacitor-community\/speech-recognition": "7.0.1"/' package.json
+          root = Path("android/app/src/main/java")
+          files = list(root.rglob("*.java"))
+          by_name = {p.name: p for p in files}
 
-          # Capacitor callback types are supplied by the Capacitor Android API.
-          for f in             "$JAVA/com/nori/jarvis/NoriKnowledgePlugin.java"             "$JAVA/com/nori/jarvis/visual/NoriExamIntegrityPlugin.java"             "$JAVA/com/nori/jarvis/visual/NoriVisualPlugin.java"; do
-            if [ -f "$f" ]; then
-              grep -q 'import com.getcapacitor.ActivityCallback;' "$f" ||                 sed -i '/^package /a import com.getcapacitor.ActivityCallback;\nimport com.getcapacitor.ActivityResult;' "$f"
-            fi
-          done
+          def package_of(p):
+              m = re.search(r'^package\s+([\w.]+)\s*;', p.read_text(errors="ignore"), re.M)
+              return m.group(1) if m else None
 
-          # Resolve the actual package names present in this ZIP instead of assuming
-          # the source files use the package names referenced by older V36 builds.
-          BRAIN_FILE="$(find "$JAVA" -type f -name 'NoriBrain.java' -print -quit)"
-          if [ -n "$BRAIN_FILE" ]; then
-            BRAIN_PKG="$(grep '^package ' "$BRAIN_FILE" | sed 's/^package //;s/;//')"
-            sed -i "s/import brain\.NoriBrain;/import $BRAIN_PKG.NoriBrain;/" "$JAVA/com/nori/jarvis/nori/NoriNativeCore.java" || true
-            sed -i "s/brain\.NoriBrain/$BRAIN_PKG.NoriBrain/g" "$JAVA/com/nori/jarvis/nori/NoriNativeCore.java"
-          fi
+          def add_import(p, fqcn):
+              s = p.read_text()
+              if f"import {fqcn};" not in s:
+                  s = re.sub(r'(^package\s+[\w.]+\s*;)', r'\1\nimport ' + fqcn + ';', s, count=1, flags=re.M)
+                  p.write_text(s)
 
-          ORCH_FILE="$(find "$JAVA" -type f -name 'NoriMetaBrainOrchestrator.java' -print -quit)"
-          if [ -n "$ORCH_FILE" ]; then
-            ORCH_PKG="$(grep '^package ' "$ORCH_FILE" | sed 's/^package //;s/;//')"
-            META="$JAVA/com/nori/jarvis/NoriMetaBrainPlugin.java"
-            grep -q "import $ORCH_PKG.NoriMetaBrainOrchestrator;" "$META" ||               sed -i "/^package /a import $ORCH_PKG.NoriMetaBrainOrchestrator;" "$META"
-          fi
+          pkg = Path("package.json")
+          s = pkg.read_text()
+          s = s.replace('"@capacitor-community/speech-recognition": "8.0.0"',
+                        '"@capacitor-community/speech-recognition": "7.0.1"')
+          pkg.write_text(s)
 
-          AUTH_FILE="$(find "$JAVA" -type f -name 'NoriSessionAuthority.java' -print -quit)"
-          if [ -n "$AUTH_FILE" ]; then
-            AUTH_PKG="$(grep '^package ' "$AUTH_FILE" | sed 's/^package //;s/;//')"
-            KNOW="$JAVA/com/nori/jarvis/NoriKnowledgePlugin.java"
-            grep -q "import $AUTH_PKG.NoriSessionAuthority;" "$KNOW" ||               sed -i "/^package /a import $AUTH_PKG.NoriSessionAuthority;" "$KNOW"
-          fi
+          for name in ["NoriKnowledgePlugin.java", "NoriExamIntegrityPlugin.java", "NoriVisualPlugin.java"]:
+              p = by_name.get(name)
+              if p:
+                  add_import(p, "com.getcapacitor.ActivityCallback")
+                  add_import(p, "com.getcapacitor.ActivityResult")
 
-          # The Android biometric class lives under android.hardware.biometrics.
-          BIO="$JAVA/com/nori/jarvis/NoriBiometricPlugin.java"
-          if [ -f "$BIO" ]; then
-            sed -i 's/^import android\.app\.BiometricPrompt;/import android.hardware.biometrics.BiometricPrompt;/' "$BIO"
-          fi
+          p = by_name.get("NoriBrain.java")
+          core = by_name.get("NoriNativeCore.java")
+          if p and core:
+              fq = package_of(p) + ".NoriBrain"
+              core.write_text(core.read_text().replace("brain.NoriBrain", fq))
 
-          # metric() returns a LinearLayout in this V36.5 implementation.
-          THEME="$JAVA/com/nori/jarvis/nori/ui/NoriTheme.java"
-          if [ -f "$THEME" ]; then
-            sed -i 's/public static TextView metric(/public static LinearLayout metric(/' "$THEME"
-          fi
+          p = by_name.get("NoriMetaBrainOrchestrator.java")
+          meta = by_name.get("NoriMetaBrainPlugin.java")
+          if p and meta:
+              add_import(meta, package_of(p) + ".NoriMetaBrainOrchestrator")
 
-          # Match the notification builder implementation.
-          ALARM="$JAVA/com/nori/jarvis/nori/android/alarm/NoriAlarmReceiver.java"
-          if [ -f "$ALARM" ]; then
-            sed -i 's/NotificationCompat\.Builder builder = new NotificationCompat\.Builder/Notification.Builder builder = new Notification.Builder/' "$ALARM"
-            sed -i '/import androidx.core.app.NotificationCompat;/d' "$ALARM"
-          fi
+          p = by_name.get("NoriSessionAuthority.java")
+          know = by_name.get("NoriKnowledgePlugin.java")
+          if p and know:
+              add_import(know, package_of(p) + ".NoriSessionAuthority")
 
-          # State is an enum in the V36.5 implementation.
-          VIEW="$JAVA/com/nori/jarvis/nori/presence/NoriInteractiveCircleView.java"
-          if [ -f "$VIEW" ]; then
-            sed -i 's/state\.name,/state.name(),/' "$VIEW"
-          fi
+          bio = by_name.get("NoriBiometricPlugin.java")
+          if bio:
+              bio.write_text(bio.read_text().replace(
+                  "import android.app.BiometricPrompt;",
+                  "import android.hardware.biometrics.BiometricPrompt;"))
 
-          # NoriDataRepository calls rawQuery() on the wrapper. If this wrapper
-          # does not expose it, add a small compatibility bridge that discovers
-          # its SQLiteDatabase field without changing the public repository API.
-          DB="$(find "$JAVA" -type f -name 'NoriDatabase.java' -print -quit)"
-          if [ -n "$DB" ] && ! grep -q 'Cursor rawQuery(' "$DB"; then
-            sed -i '/^}/i\
-    public android.database.Cursor rawQuery(String sql, String[] args) {\
-        try {\
-            java.lang.reflect.Field f = null;\
-            Class<?> c = getClass();\
-            while (c != null && f == null) {\
-                for (java.lang.reflect.Field x : c.getDeclaredFields()) {\
-                    if (android.database.sqlite.SQLiteDatabase.class.isAssignableFrom(x.getType())) { f = x; break; }\
-                }\
-                c = c.getSuperclass();\
-            }\
-            if (f == null) throw new IllegalStateException("No SQLiteDatabase field found");\
-            f.setAccessible(true);\
-            android.database.sqlite.SQLiteDatabase db = (android.database.sqlite.SQLiteDatabase) f.get(this);\
-            return db.rawQuery(sql, args);\
-        } catch (Exception e) { throw new IllegalStateException(e); }\
-    }' "$DB"
-          fi
+          theme = by_name.get("NoriTheme.java")
+          if theme:
+              theme.write_text(theme.read_text().replace(
+                  "public static TextView metric(",
+                  "public static LinearLayout metric("))
 
-          echo "V36.5 compatibility repair complete."
-          echo "Resolved native sources:"
-          find "$JAVA" -type f -name '*.java' | sort | sed -n '1,300p'
+          alarm = by_name.get("NoriAlarmReceiver.java")
+          if alarm:
+              s = alarm.read_text()
+              s = s.replace(
+                  "NotificationCompat.Builder builder = new NotificationCompat.Builder",
+                  "Notification.Builder builder = new Notification.Builder")
+              s = s.replace("import androidx.core.app.NotificationCompat;\n", "")
+              alarm.write_text(s)
+
+          view = by_name.get("NoriInteractiveCircleView.java")
+          if view:
+              view.write_text(view.read_text().replace("state.name,", "state.name(),"))
+
+          db = by_name.get("NoriDatabase.java")
+          if db and "Cursor rawQuery(" not in db.read_text():
+              s = db.read_text()
+              fields = re.findall(
+                  r'(?:private|protected|public)?\s*(?:final\s+)?SQLiteDatabase\s+(\w+)\s*[;=]',
+                  s)
+              field = fields[0] if fields else None
+              if field:
+                  method = (
+                      "\n    public android.database.Cursor rawQuery(String sql, String[] args) {\n"
+                      f"        return {field}.rawQuery(sql, args);\n"
+                      "    }\n")
+                  pos = s.rfind("}")
+                  db.write_text(s[:pos] + method + s[pos:])
+
+          print("Native V36.5 compatibility repairs applied.")
+          PY
 
       - name: Install web dependencies
         shell: bash
