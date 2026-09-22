@@ -47,7 +47,7 @@ jobs:
         with:
           node-version: '22'
 
-      - name: Repair V36.5 native source mismatches
+      - name: Repair V36.5 source and dependency compatibility
         shell: bash
         run: |
           set -e
@@ -67,78 +67,107 @@ jobs:
           def add_import(p, fqcn):
               s = p.read_text()
               if f"import {fqcn};" not in s:
-                  s = re.sub(r'(^package\s+[\w.]+\s*;)', r'\1\nimport ' + fqcn + ';', s, count=1, flags=re.M)
+                  s = re.sub(
+                      r'(^package\s+[\w.]+\s*;)',
+                      r'\1\nimport ' + fqcn + ';',
+                      s, count=1, flags=re.M)
                   p.write_text(s)
 
+          # The ZIP declares the speech plugin at 8.0.0, but that package
+          # version is unavailable to npm. Keep the known installable pin.
           pkg = Path("package.json")
           s = pkg.read_text()
-          s = s.replace('"@capacitor-community/speech-recognition": "8.0.0"',
-                        '"@capacitor-community/speech-recognition": "7.0.1"')
+          s = s.replace(
+              '"@capacitor-community/speech-recognition": "8.0.0"',
+              '"@capacitor-community/speech-recognition": "7.0.1"')
           pkg.write_text(s)
 
-          for name in ["NoriKnowledgePlugin.java", "NoriExamIntegrityPlugin.java", "NoriVisualPlugin.java"]:
+          # Capacitor 8 uses AndroidX ActivityResult and puts the callback
+          # annotation under com.getcapacitor.annotation.
+          for name in [
+              "NoriKnowledgePlugin.java",
+              "NoriExamIntegrityPlugin.java",
+              "NoriVisualPlugin.java"
+          ]:
               p = by_name.get(name)
               if p:
-                  add_import(p, "com.getcapacitor.ActivityCallback")
-                  add_import(p, "com.getcapacitor.ActivityResult")
+                  s = p.read_text()
+                  s = s.replace("import com.getcapacitor.ActivityResult;",
+                                "import androidx.activity.result.ActivityResult;")
+                  s = s.replace("import com.getcapacitor.ActivityCallback;",
+                                "import com.getcapacitor.annotation.ActivityCallback;")
+                  p.write_text(s)
 
-          p = by_name.get("NoriBrain.java")
+          # Resolve actual V36.5 brain package.
+          brain = by_name.get("NoriBrain.java")
           core = by_name.get("NoriNativeCore.java")
-          if p and core:
-              fq = package_of(p) + ".NoriBrain"
-              core.write_text(core.read_text().replace("brain.NoriBrain", fq))
+          if brain and core:
+              fq = package_of(brain) + ".NoriBrain"
+              s = core.read_text()
+              s = s.replace("brain.NoriBrain", fq)
+              if f"import {fq};" not in s:
+                  s = re.sub(r'(^package\s+[\w.]+\s*;)',
+                             r'\1\nimport ' + fq + ';', s, count=1, flags=re.M)
+              core.write_text(s)
 
-          p = by_name.get("NoriMetaBrainOrchestrator.java")
+          # Resolve actual V36.5 meta-brain package.
+          orch = by_name.get("NoriMetaBrainOrchestrator.java")
           meta = by_name.get("NoriMetaBrainPlugin.java")
-          if p and meta:
-              add_import(meta, package_of(p) + ".NoriMetaBrainOrchestrator")
+          if orch and meta:
+              add_import(meta, package_of(orch) + ".NoriMetaBrainOrchestrator")
 
-          p = by_name.get("NoriSessionAuthority.java")
+          # Resolve the session-authority package if present.
+          auth = by_name.get("NoriSessionAuthority.java")
           know = by_name.get("NoriKnowledgePlugin.java")
-          if p and know:
-              add_import(know, package_of(p) + ".NoriSessionAuthority")
+          if auth and know:
+              add_import(know, package_of(auth) + ".NoriSessionAuthority")
 
+          # Keep Android framework biometric API compatible.
           bio = by_name.get("NoriBiometricPlugin.java")
           if bio:
-              bio.write_text(bio.read_text().replace(
+              s = bio.read_text().replace(
                   "import android.app.BiometricPrompt;",
-                  "import android.hardware.biometrics.BiometricPrompt;"))
+                  "import android.hardware.biometrics.BiometricPrompt;")
+              bio.write_text(s)
 
+          # V36.5 NoriTheme.metric returns LinearLayout.
           theme = by_name.get("NoriTheme.java")
           if theme:
-              theme.write_text(theme.read_text().replace(
+              s = theme.read_text().replace(
                   "public static TextView metric(",
-                  "public static LinearLayout metric("))
+                  "public static LinearLayout metric(")
+              theme.write_text(s)
 
+          # NoriAlarmReceiver already uses Notification.Builder downstream;
+          # remove the stale NotificationCompat construction.
           alarm = by_name.get("NoriAlarmReceiver.java")
           if alarm:
               s = alarm.read_text()
-              s = s.replace(
-                  "NotificationCompat.Builder builder = new NotificationCompat.Builder",
-                  "Notification.Builder builder = new Notification.Builder")
               s = s.replace("import androidx.core.app.NotificationCompat;\n", "")
+              s = s.replace(
+                  "Notification.Builder builder = new NotificationCompat.Builder("
+                  "context, NoriNotificationService.CHANNEL_REMINDERS)",
+                  "Notification.Builder builder = new Notification.Builder(context)")
               alarm.write_text(s)
 
+          # NativeDataRepository expects a rawQuery bridge on NoriDatabase.
+          db = by_name.get("NoriDatabase.java")
+          if db and "public android.database.Cursor rawQuery(" not in db.read_text():
+              s = db.read_text()
+              pos = s.rfind("}")
+              method = """
+              public android.database.Cursor rawQuery(String sql, String[] args) {
+                  return getReadableDatabase().rawQuery(sql, args);
+              }
+              """
+              db.write_text(s[:pos] + method + s[pos:])
+
+          # State is an enum in the V36.5 interactive view.
           view = by_name.get("NoriInteractiveCircleView.java")
           if view:
               view.write_text(view.read_text().replace("state.name,", "state.name(),"))
 
-          db = by_name.get("NoriDatabase.java")
-          if db and "Cursor rawQuery(" not in db.read_text():
-              s = db.read_text()
-              fields = re.findall(
-                  r'(?:private|protected|public)?\s*(?:final\s+)?SQLiteDatabase\s+(\w+)\s*[;=]',
-                  s)
-              field = fields[0] if fields else None
-              if field:
-                  method = (
-                      "\n    public android.database.Cursor rawQuery(String sql, String[] args) {\n"
-                      f"        return {field}.rawQuery(sql, args);\n"
-                      "    }\n")
-                  pos = s.rfind("}")
-                  db.write_text(s[:pos] + method + s[pos:])
-
-          print("Native V36.5 compatibility repairs applied.")
+          print("All known V36.5 source compatibility repairs applied.")
           PY
 
       - name: Install web dependencies
