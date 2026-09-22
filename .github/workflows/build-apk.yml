@@ -74,8 +74,11 @@ jobs:
         run: |
           set -e
           chmod +x gradlew
-          sed -i 's/gradle-9\.7\.1/gradle-9.5/g' gradle/wrapper/gradle-wrapper.properties
-          echo "Gradle wrapper is executable and pinned to Gradle 9.5."
+          sed -E -i 's#^distributionUrl=.*#distributionUrl=https\\://services.gradle.org/distributions/gradle-9.5-bin.zip#' gradle/wrapper/gradle-wrapper.properties
+          echo "Gradle wrapper is executable."
+          echo "Configured wrapper:"
+          grep '^distributionUrl=' gradle/wrapper/gradle-wrapper.properties
+          ./gradlew --version
 
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v6
