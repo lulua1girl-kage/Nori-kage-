@@ -53,22 +53,98 @@ jobs:
         with:
           node-version: '22'
 
-      - name: Apply build compatibility fixes
+      - name: Repair V36.5 Java source compatibility
         shell: bash
         run: |
           set -e
           cd "$PROJECT_DIR"
+          JAVA="android/app/src/main/java"
 
+          # npm compatibility
           sed -i 's/"@capacitor-community\/speech-recognition": "8\.0\.0"/"@capacitor-community\/speech-recognition": "7.0.1"/' package.json
 
-          sed -i 's/^import android\.app\.BiometricPrompt;/import android.hardware.biometrics.BiometricPrompt;/'             android/app/src/main/java/com/nori/jarvis/NoriBiometricPlugin.java
+          # Capacitor callback types are supplied by the Capacitor Android API.
+          for f in             "$JAVA/com/nori/jarvis/NoriKnowledgePlugin.java"             "$JAVA/com/nori/jarvis/visual/NoriExamIntegrityPlugin.java"             "$JAVA/com/nori/jarvis/visual/NoriVisualPlugin.java"; do
+            if [ -f "$f" ]; then
+              grep -q 'import com.getcapacitor.ActivityCallback;' "$f" ||                 sed -i '/^package /a import com.getcapacitor.ActivityCallback;\nimport com.getcapacitor.ActivityResult;' "$f"
+            fi
+          done
 
-          sed -i 's/public static TextView metric(/public static LinearLayout metric(/'             android/app/src/main/java/com/nori/jarvis/nori/ui/NoriTheme.java
+          # Resolve the actual package names present in this ZIP instead of assuming
+          # the source files use the package names referenced by older V36 builds.
+          BRAIN_FILE="$(find "$JAVA" -type f -name 'NoriBrain.java' -print -quit)"
+          if [ -n "$BRAIN_FILE" ]; then
+            BRAIN_PKG="$(grep '^package ' "$BRAIN_FILE" | sed 's/^package //;s/;//')"
+            sed -i "s/import brain\.NoriBrain;/import $BRAIN_PKG.NoriBrain;/" "$JAVA/com/nori/jarvis/nori/NoriNativeCore.java" || true
+            sed -i "s/brain\.NoriBrain/$BRAIN_PKG.NoriBrain/g" "$JAVA/com/nori/jarvis/nori/NoriNativeCore.java"
+          fi
 
-          sed -i 's/Notification.Builder builder = new NotificationCompat.Builder(context, NoriNotificationService.CHANNEL_REMINDERS)/Notification.Builder builder = new Notification.Builder(context, NoriNotificationService.CHANNEL_REMINDERS)/'             android/app/src/main/java/com/nori/jarvis/nori/android/alarm/NoriAlarmReceiver.java
-          sed -i '/import androidx.core.app.NotificationCompat;/d'             android/app/src/main/java/com/nori/jarvis/nori/android/alarm/NoriAlarmReceiver.java
+          ORCH_FILE="$(find "$JAVA" -type f -name 'NoriMetaBrainOrchestrator.java' -print -quit)"
+          if [ -n "$ORCH_FILE" ]; then
+            ORCH_PKG="$(grep '^package ' "$ORCH_FILE" | sed 's/^package //;s/;//')"
+            META="$JAVA/com/nori/jarvis/NoriMetaBrainPlugin.java"
+            grep -q "import $ORCH_PKG.NoriMetaBrainOrchestrator;" "$META" ||               sed -i "/^package /a import $ORCH_PKG.NoriMetaBrainOrchestrator;" "$META"
+          fi
 
-          echo "Applied source compatibility fixes."
+          AUTH_FILE="$(find "$JAVA" -type f -name 'NoriSessionAuthority.java' -print -quit)"
+          if [ -n "$AUTH_FILE" ]; then
+            AUTH_PKG="$(grep '^package ' "$AUTH_FILE" | sed 's/^package //;s/;//')"
+            KNOW="$JAVA/com/nori/jarvis/NoriKnowledgePlugin.java"
+            grep -q "import $AUTH_PKG.NoriSessionAuthority;" "$KNOW" ||               sed -i "/^package /a import $AUTH_PKG.NoriSessionAuthority;" "$KNOW"
+          fi
+
+          # The Android biometric class lives under android.hardware.biometrics.
+          BIO="$JAVA/com/nori/jarvis/NoriBiometricPlugin.java"
+          if [ -f "$BIO" ]; then
+            sed -i 's/^import android\.app\.BiometricPrompt;/import android.hardware.biometrics.BiometricPrompt;/' "$BIO"
+          fi
+
+          # metric() returns a LinearLayout in this V36.5 implementation.
+          THEME="$JAVA/com/nori/jarvis/nori/ui/NoriTheme.java"
+          if [ -f "$THEME" ]; then
+            sed -i 's/public static TextView metric(/public static LinearLayout metric(/' "$THEME"
+          fi
+
+          # Match the notification builder implementation.
+          ALARM="$JAVA/com/nori/jarvis/nori/android/alarm/NoriAlarmReceiver.java"
+          if [ -f "$ALARM" ]; then
+            sed -i 's/NotificationCompat\.Builder builder = new NotificationCompat\.Builder/Notification.Builder builder = new Notification.Builder/' "$ALARM"
+            sed -i '/import androidx.core.app.NotificationCompat;/d' "$ALARM"
+          fi
+
+          # State is an enum in the V36.5 implementation.
+          VIEW="$JAVA/com/nori/jarvis/nori/presence/NoriInteractiveCircleView.java"
+          if [ -f "$VIEW" ]; then
+            sed -i 's/state\.name,/state.name(),/' "$VIEW"
+          fi
+
+          # NoriDataRepository calls rawQuery() on the wrapper. If this wrapper
+          # does not expose it, add a small compatibility bridge that discovers
+          # its SQLiteDatabase field without changing the public repository API.
+          DB="$(find "$JAVA" -type f -name 'NoriDatabase.java' -print -quit)"
+          if [ -n "$DB" ] && ! grep -q 'Cursor rawQuery(' "$DB"; then
+            sed -i '/^}/i\
+    public android.database.Cursor rawQuery(String sql, String[] args) {\
+        try {\
+            java.lang.reflect.Field f = null;\
+            Class<?> c = getClass();\
+            while (c != null && f == null) {\
+                for (java.lang.reflect.Field x : c.getDeclaredFields()) {\
+                    if (android.database.sqlite.SQLiteDatabase.class.isAssignableFrom(x.getType())) { f = x; break; }\
+                }\
+                c = c.getSuperclass();\
+            }\
+            if (f == null) throw new IllegalStateException("No SQLiteDatabase field found");\
+            f.setAccessible(true);\
+            android.database.sqlite.SQLiteDatabase db = (android.database.sqlite.SQLiteDatabase) f.get(this);\
+            return db.rawQuery(sql, args);\
+        } catch (Exception e) { throw new IllegalStateException(e); }\
+    }' "$DB"
+          fi
+
+          echo "V36.5 compatibility repair complete."
+          echo "Resolved native sources:"
+          find "$JAVA" -type f -name '*.java' | sort | sed -n '1,300p'
 
       - name: Install web dependencies
         shell: bash
