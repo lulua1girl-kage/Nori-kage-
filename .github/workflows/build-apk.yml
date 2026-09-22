@@ -68,21 +68,19 @@ jobs:
         working-directory: ${{ env.PROJECT_DIR }}
         run: npx cap sync android
 
-      - name: Prepare Gradle wrapper
+      - name: Install Gradle 9.5.1
         working-directory: ${{ env.PROJECT_DIR }}/android
         shell: bash
         run: |
           set -e
-          chmod +x gradlew
-          sed -E -i 's#gradle-[0-9.]+-bin.zip#gradle-9.5.0-bin.zip#' gradle/wrapper/gradle-wrapper.properties
-          echo "Gradle wrapper is executable."
-          echo "Configured wrapper:"
-          grep '^distributionUrl=' gradle/wrapper/gradle-wrapper.properties
-          ./gradlew --version
+          curl -fsSL -o /tmp/gradle-9.5.1-bin.zip https://services.gradle.org/distributions/gradle-9.5.1-bin.zip
+          rm -rf /tmp/gradle-9.5.1
+          unzip -q /tmp/gradle-9.5.1-bin.zip -d /tmp
+          /tmp/gradle-9.5.1/bin/gradle --version
 
       - name: Build debug APK
         working-directory: ${{ env.PROJECT_DIR }}/android
-        run: ./gradlew assembleDebug --no-daemon --stacktrace
+        run: /tmp/gradle-9.5.1/bin/gradle assembleDebug --no-daemon --stacktrace
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
