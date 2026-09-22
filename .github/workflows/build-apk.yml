@@ -73,14 +73,14 @@ jobs:
         shell: bash
         run: |
           set -e
-          curl -fsSL -o /tmp/gradle-9.5.1-bin.zip https://services.gradle.org/distributions/gradle-9.5.1-bin.zip
-          rm -rf /tmp/gradle-9.5.1
-          unzip -q /tmp/gradle-9.5.1-bin.zip -d /tmp
-          /tmp/gradle-9.5.1/bin/gradle --version
+          curl -fsSL -o /tmp/gradle-9.5.0-bin.zip https://services.gradle.org/distributions/gradle-9.5.0-bin.zip
+          rm -rf /tmp/gradle-9.5.0
+          unzip -q /tmp/gradle-9.5.0-bin.zip -d /tmp
+          /tmp/gradle-9.5.0/bin/gradle --version
 
       - name: Build debug APK
         working-directory: ${{ env.PROJECT_DIR }}/android
-        run: /tmp/gradle-9.5.1/bin/gradle assembleDebug --no-daemon --stacktrace
+        run: /tmp/gradle-9.5.0/bin/gradle assembleDebug --no-daemon --stacktrace
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
