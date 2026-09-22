@@ -74,7 +74,7 @@ jobs:
         run: |
           set -e
           chmod +x gradlew
-          sed -E -i 's#^distributionUrl=.*#distributionUrl=https\\://services.gradle.org/distributions/gradle-9.5.0-bin.zip#' gradle/wrapper/gradle-wrapper.properties
+          sed -E -i 's#gradle-[0-9.]+-bin.zip#gradle-9.5.0-bin.zip#' gradle/wrapper/gradle-wrapper.properties
           echo "Gradle wrapper is executable."
           echo "Configured wrapper:"
           grep '^distributionUrl=' gradle/wrapper/gradle-wrapper.properties
