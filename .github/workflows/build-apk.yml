@@ -52,6 +52,14 @@ jobs:
         with:
           node-version: '22'
 
+      - name: Fix unavailable speech recognition package version
+        working-directory: ${{ env.PROJECT_DIR }}
+        shell: bash
+        run: |
+          set -e
+          sed -i 's/"@capacitor-community\/speech-recognition": "8\.0\.0"/"@capacitor-community\/speech-recognition": "7.0.1"/' package.json
+          echo "Speech recognition package pinned to 7.0.1."
+
       - name: Install web dependencies
         working-directory: ${{ env.PROJECT_DIR }}
         run: npm install
