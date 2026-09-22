@@ -68,6 +68,38 @@ jobs:
         working-directory: ${{ env.PROJECT_DIR }}
         run: npx cap sync android
 
+      - name: Restore missing native Java sources from hardened V36.5
+        shell: bash
+        run: |
+          set -e
+          rm -rf .nori-hardened
+          mkdir -p .nori-hardened
+          unzip -q "Nori-V36.5-BRAIN-LOOP-PRODUCTION-HARDENED.zip" -d .nori-hardened
+          HARDENED_DIR="$(find .nori-hardened -type d -name 'v364-connect' -print -quit)"
+          if [ -z "$HARDENED_DIR" ]; then
+            echo "Hardened v364-connect project was not found."
+            unzip -l "Nori-V36.5-BRAIN-LOOP-PRODUCTION-HARDENED.zip" | head -100
+            exit 1
+          fi
+          SRC="$HARDENED_DIR/android/app/src/main/java"
+          DST="$GITHUB_WORKSPACE/${{ env.PROJECT_DIR }}/android/app/src/main/java"
+          if [ ! -d "$SRC" ]; then
+            echo "Hardened Java source directory was not found: $SRC"
+            exit 1
+          fi
+          mkdir -p "$DST"
+          while IFS= read -r -d '' file; do
+            rel=$(printf '%s' "$file" | sed "s#^$SRC/##")
+            target="$DST/$rel"
+            if [ ! -f "$target" ]; then
+              mkdir -p "$(dirname "$target")"
+              cp "$file" "$target"
+              echo "RESTORED $rel"
+            fi
+          done < <(find "$SRC" -type f -name '*.java' -print0)
+          echo "Native Java source inventory:"
+          find "$DST" -type f -name '*.java' | sort | sed -n '1,250p'
+
       - name: Install Gradle 9.5.1
         working-directory: ${{ env.PROJECT_DIR }}/android
         shell: bash
