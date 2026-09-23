@@ -247,7 +247,7 @@ jobs:
           BADGING="$("$AAPT2" dump badging "$APK")"
           echo "$BADGING"
           ! echo "$BADGING" | grep -q "testOnly='true'"
-          echo "$BADGING" | grep -q "package: name='com.nori.jarvis.v365clean'"
+          echo "$BADGING" | grep -q "package: name='com.nori.jarvis.v365clean.debug'"
           unzip -t "$APK" >/dev/null
           echo "APK signature, alignment, manifest, package ID, and ZIP integrity verification passed."
 
