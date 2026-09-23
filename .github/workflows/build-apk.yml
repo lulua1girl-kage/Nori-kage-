@@ -159,6 +159,30 @@ jobs:
           grep -q "justicesteve.councle@gmail.com" "$PROJECT_DIR/www/nori-auth-gate-v1.js"
           echo "Admission gate patched and syntax-checked."
 
+      - name: Patch native Nori brain endpoint and voice timing
+        shell: bash
+        run: |
+          set -e
+          cd "$PROJECT_DIR"
+          python3 - <<'PY'
+          from pathlib import Path
+          import re
+
+          meet=Path("www/nori-meet.js")
+          s=meet.read_text()
+          s=s.replace('const NORI_BRAIN_ENDPOINT = NORI_API_BASE_URL + "/api/brain";', 'const NORI_BRAIN_ENDPOINT = "https://qrlvkxewyoceykaquapv.supabase.co/functions/v1/nori-brain";')
+          old='headers: { "Content-Type": "application/json" },'
+          new='headers: Object.assign({ "Content-Type": "application/json" }, await (async function(){ try { const ss=(await window.NoriProductionAuth?.session?.())?.data?.session; return ss?.access_token ? { Authorization: "Bearer "+ss.access_token } : {}; } catch(e) { return {}; } })()),'
+          s=s.replace(old,new,1)
+          s=s.replace('Check that api/brain.js is deployed and GEMINI_API_KEY / OPENAI_API_KEY are set.', 'Check the Nori brain service configuration.')
+          meet.write_text(s)
+
+          bridge=Path("www/nori-native-bridge.js")
+          b=bridge.read_text().replace('silenceTimer=setTimeout(function(){finish(latest)},850);','silenceTimer=setTimeout(function(){finish(latest)},1800);')
+          bridge.write_text(b)
+          print("Native brain endpoint, authenticated request header, and speech settle timing patched.")
+          PY
+
       - name: Install web dependencies
         shell: bash
         run: |
@@ -170,22 +194,6 @@ jobs:
         run: |
           cd "$PROJECT_DIR"
           npx cap sync android
-
-      - name: Disable incompatible speech plugin for startup test
-        shell: bash
-        run: |
-          set -e
-          cd "$PROJECT_DIR"
-          python3 - <<'PY'
-          import json
-          from pathlib import Path
-          p = Path("android/app/src/main/assets/capacitor.plugins.json")
-          data = json.loads(p.read_text())
-          data = [x for x in data if x.get("pkg") != "@capacitor-community/speech-recognition"]
-          p.write_text(json.dumps(data, indent=2) + "\n")
-          print("Remaining auto-loaded Capacitor plugins:")
-          print(json.dumps(data, indent=2))
-          PY
 
       - name: Install Gradle 8.13
         shell: bash
