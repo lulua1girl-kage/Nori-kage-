@@ -92,11 +92,8 @@ jobs:
               p = by_name.get(name)
               if p:
                   s = p.read_text()
-                  s = s.replace("import com.getcapacitor.ActivityResult;",
-                                "import androidx.activity.result.ActivityResult;")
-                  s = s.replace("import com.getcapacitor.ActivityCallback;",
-                                "import com.getcapacitor.annotation.ActivityCallback;")
-                  p.write_text(s)
+                  add_import(p, "androidx.activity.result.ActivityResult")
+                  add_import(p, "com.getcapacitor.annotation.ActivityCallback")
 
           # Resolve actual V36.5 brain package.
           brain = by_name.get("NoriBrain.java")
