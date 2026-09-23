@@ -209,10 +209,14 @@ jobs:
           s = p.read_text()
           # Give this build a distinct application ID so Android can install it
           # even when an older Nori build is already signed with another key.
-          s2, n = re.subn(r"(applicationId\s+)['"][^'"]+['"]", r'\1"com.nori.jarvis.v365clean"', s, count=1)
-          if n != 1:
-              raise SystemExit("Could not locate exactly one applicationId in app/build.gradle")
-          p.write_text(s2)
+          lines = s.splitlines()
+          matches = [i for i, line in enumerate(lines) if line.strip().startswith("applicationId ")]
+          if len(matches) != 1:
+              raise SystemExit(f"Expected exactly one applicationId line, found {len(matches)}")
+          i = matches[0]
+          indent = lines[i][:len(lines[i]) - len(lines[i].lstrip())]
+          lines[i] = indent + 'applicationId "com.nori.jarvis.v365clean"'
+          p.write_text("\n".join(lines) + "\n")
           print("Standalone applicationId: com.nori.jarvis.v365clean")
           PY
 
