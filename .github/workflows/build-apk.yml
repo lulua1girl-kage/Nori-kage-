@@ -194,8 +194,18 @@ jobs:
           cd "$PROJECT_DIR/android"
           /tmp/gradle-8.13/bin/gradle assembleDebug --no-daemon --stacktrace
 
+      - name: Locate APK
+        shell: bash
+        run: |
+          set -e
+          APK="$(find "$PROJECT_DIR/android/app/build/outputs/apk" -type f -name '*.apk' -print -quit)"
+          test -n "$APK"
+          cp "$APK" "$GITHUB_WORKSPACE/nori-debug.apk"
+          ls -lh "$GITHUB_WORKSPACE/nori-debug.apk"
+
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
           name: nori-debug-apk
-          path: .nori-v36/**/android/app/build/outputs/apk/debug/*.apk
+          path: ./nori-debug.apk
+          if-no-files-found: error
