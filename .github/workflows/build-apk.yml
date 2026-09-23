@@ -164,7 +164,50 @@ jobs:
           if view:
               view.write_text(view.read_text().replace("state.name,", "state.name(),"))
 
-          print("All known V36.5 source compatibility repairs applied.")
+          # Make startup resilient on Android 13: a single optional native plugin
+          # must not be able to prevent the Capacitor/Web UI from launching.
+          main = Path("android/app/src/main/java/com/nori/jarvis/MainActivity.java")
+          if main.exists():
+              main.write_text("""package com.nori.jarvis;
+
+import android.os.Bundle;
+import com.getcapacitor.BridgeActivity;
+import com.nori.jarvis.voice.NoriVoicePlugin;
+import com.nori.jarvis.visual.NoriVisualPlugin;
+
+public class MainActivity extends BridgeActivity {
+    @Override
+    public void onCreate(Bundle savedInstanceState) {
+        // Register optional native integrations defensively. The core Nori UI must
+        // still launch if one optional plugin has a device/library compatibility issue.
+        safeRegister(() -> registerPlugin(NoriBlockerPlugin.class));
+        safeRegister(() -> registerPlugin(NoriVoicePlugin.class));
+        safeRegister(() -> registerPlugin(NoriVisualPlugin.class));
+        safeRegister(() -> registerPlugin(NoriWorldPlugin.class));
+        safeRegister(() -> registerPlugin(NoriOperationsPlugin.class));
+        safeRegister(() -> registerPlugin(NoriDevicePlugin.class));
+        safeRegister(() -> registerPlugin(NoriMetaBrainPlugin.class));
+        safeRegister(() -> registerPlugin(NoriRuntimePlugin.class));
+        safeRegister(() -> registerPlugin(NoriAuthPlugin.class));
+        safeRegister(() -> registerPlugin(NoriAdminPlugin.class));
+        safeRegister(() -> registerPlugin(NoriKnowledgePlugin.class));
+        safeRegister(() -> registerPlugin(NoriBiometricPlugin.class));
+        safeRegister(() -> registerPlugin(com.nori.jarvis.visual.NoriExamIntegrityPlugin.class));
+        super.onCreate(savedInstanceState);
+    }
+
+    private void safeRegister(Runnable registration) {
+        try {
+            registration.run();
+        } catch (Throwable ignored) {
+            // Keep startup alive; the affected optional feature can remain unavailable.
+        }
+    }
+}
+""")
+
+          print("All known V36.5 source compatibility repairs applied, including Android 13-safe startup.")
+
           PY
 
       - name: Install web dependencies
