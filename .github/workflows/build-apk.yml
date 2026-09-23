@@ -67,87 +67,52 @@ jobs:
           def add_import(p, fqcn):
               s = p.read_text()
               if f"import {fqcn};" not in s:
-                  s = re.sub(
-                      r'(^package\s+[\w.]+\s*;)',
-                      r'\1\nimport ' + fqcn + ';',
-                      s, count=1, flags=re.M)
+                  s = re.sub(r'(^package\s+[\w.]+\s*;)', r'\1\nimport ' + fqcn + ';', s, count=1, flags=re.M)
                   p.write_text(s)
 
-          # The ZIP declares the speech plugin at 8.0.0, but that package
-          # version is unavailable to npm. Keep the known installable pin.
           pkg = Path("package.json")
-          s = pkg.read_text()
-          s = s.replace(
-              '"@capacitor-community/speech-recognition": "8.0.0"',
-              '"@capacitor-community/speech-recognition": "7.0.1"')
+          s = pkg.read_text().replace('"@capacitor-community/speech-recognition": "8.0.0"', '"@capacitor-community/speech-recognition": "7.0.1"')
           pkg.write_text(s)
 
-          # Capacitor 8 uses AndroidX ActivityResult and puts the callback
-          # annotation under com.getcapacitor.annotation.
-          for name in [
-              "NoriKnowledgePlugin.java",
-              "NoriExamIntegrityPlugin.java",
-              "NoriVisualPlugin.java"
-          ]:
+          for name in ["NoriKnowledgePlugin.java", "NoriExamIntegrityPlugin.java", "NoriVisualPlugin.java"]:
               p = by_name.get(name)
               if p:
-                  s = p.read_text()
                   add_import(p, "androidx.activity.result.ActivityResult")
                   add_import(p, "com.getcapacitor.annotation.ActivityCallback")
 
-          # Resolve actual V36.5 brain package.
           brain = by_name.get("NoriBrain.java")
           core = by_name.get("NoriNativeCore.java")
           if brain and core:
               fq = package_of(brain) + ".NoriBrain"
-              s = core.read_text()
-              s = s.replace("brain.NoriBrain", fq)
+              s = core.read_text().replace("brain.NoriBrain", fq)
               if f"import {fq};" not in s:
-                  s = re.sub(r'(^package\s+[\w.]+\s*;)',
-                             r'\1\nimport ' + fq + ';', s, count=1, flags=re.M)
+                  s = re.sub(r'(^package\s+[\w.]+\s*;)', r'\1\nimport ' + fq + ';', s, count=1, flags=re.M)
               core.write_text(s)
 
-          # Resolve actual V36.5 meta-brain package.
           orch = by_name.get("NoriMetaBrainOrchestrator.java")
           meta = by_name.get("NoriMetaBrainPlugin.java")
           if orch and meta:
               add_import(meta, package_of(orch) + ".NoriMetaBrainOrchestrator")
 
-          # Resolve the session-authority package if present.
           auth = by_name.get("NoriSessionAuthority.java")
           know = by_name.get("NoriKnowledgePlugin.java")
           if auth and know:
               add_import(know, package_of(auth) + ".NoriSessionAuthority")
 
-          # Keep Android framework biometric API compatible.
           bio = by_name.get("NoriBiometricPlugin.java")
           if bio:
-              s = bio.read_text().replace(
-                  "import android.app.BiometricPrompt;",
-                  "import android.hardware.biometrics.BiometricPrompt;")
-              bio.write_text(s)
+              bio.write_text(bio.read_text().replace("import android.app.BiometricPrompt;", "import android.hardware.biometrics.BiometricPrompt;"))
 
-          # V36.5 NoriTheme.metric returns LinearLayout.
           theme = by_name.get("NoriTheme.java")
           if theme:
-              s = theme.read_text().replace(
-                  "public static TextView metric(",
-                  "public static LinearLayout metric(")
-              theme.write_text(s)
+              theme.write_text(theme.read_text().replace("public static TextView metric(", "public static LinearLayout metric("))
 
-          # NoriAlarmReceiver already uses Notification.Builder downstream;
-          # remove the stale NotificationCompat construction.
           alarm = by_name.get("NoriAlarmReceiver.java")
           if alarm:
-              s = alarm.read_text()
-              s = s.replace("import androidx.core.app.NotificationCompat;\n", "")
-              s = s.replace(
-                  "Notification.Builder builder = new NotificationCompat.Builder("
-                  "context, NoriNotificationService.CHANNEL_REMINDERS)",
-                  "Notification.Builder builder = new Notification.Builder(context)")
+              s = alarm.read_text().replace("import androidx.core.app.NotificationCompat;\n", "")
+              s = s.replace("Notification.Builder builder = new NotificationCompat.Builder(context, NoriNotificationService.CHANNEL_REMINDERS)", "Notification.Builder builder = new Notification.Builder(context)")
               alarm.write_text(s)
 
-          # NativeDataRepository expects a rawQuery bridge on NoriDatabase.
           db = by_name.get("NoriDatabase.java")
           if db and "public android.database.Cursor rawQuery(" not in db.read_text():
               s = db.read_text()
@@ -159,56 +124,28 @@ jobs:
               """
               db.write_text(s[:pos] + method + s[pos:])
 
-          # State is an enum in the V36.5 interactive view.
           view = by_name.get("NoriInteractiveCircleView.java")
           if view:
               view.write_text(view.read_text().replace("state.name,", "state.name(),"))
 
-          # Make startup resilient on Android 13: a single optional native plugin
-          # must not be able to prevent the Capacitor/Web UI from launching.
+          # Diagnostic startup mode: use only the clean Capacitor launcher.
           main = Path("android/app/src/main/java/com/nori/jarvis/MainActivity.java")
           if main.exists():
-              main_source = """package com.nori.jarvis;
-          
+              main.write_text("""package com.nori.jarvis;
+
           import android.os.Bundle;
           import com.getcapacitor.BridgeActivity;
-          import com.nori.jarvis.voice.NoriVoicePlugin;
-          import com.nori.jarvis.visual.NoriVisualPlugin;
-          
+
           public class MainActivity extends BridgeActivity {
               @Override
               public void onCreate(Bundle savedInstanceState) {
-                  safeRegister(() -> registerPlugin(NoriBlockerPlugin.class));
-                  safeRegister(() -> registerPlugin(NoriVoicePlugin.class));
-                  safeRegister(() -> registerPlugin(NoriVisualPlugin.class));
-                  safeRegister(() -> registerPlugin(NoriWorldPlugin.class));
-                  safeRegister(() -> registerPlugin(NoriOperationsPlugin.class));
-                  safeRegister(() -> registerPlugin(NoriDevicePlugin.class));
-                  safeRegister(() -> registerPlugin(NoriMetaBrainPlugin.class));
-                  safeRegister(() -> registerPlugin(NoriRuntimePlugin.class));
-                  safeRegister(() -> registerPlugin(NoriAuthPlugin.class));
-                  safeRegister(() -> registerPlugin(NoriAdminPlugin.class));
-                  safeRegister(() -> registerPlugin(NoriKnowledgePlugin.class));
-                  safeRegister(() -> registerPlugin(NoriBiometricPlugin.class));
-                  safeRegister(() -> registerPlugin(com.nori.jarvis.visual.NoriExamIntegrityPlugin.class));
                   super.onCreate(savedInstanceState);
               }
-          
-              private void safeRegister(Runnable registration) {
-                  try {
-                      registration.run();
-                  } catch (Throwable ignored) {
-                      // Optional native integrations must not block core startup.
-                  }
-              }
           }
-          """
-              # Strip the YAML indentation from the Java template.
-              main_source = "\n".join(line[10:] if line.startswith("          ") else line for line in main_source.splitlines())
-              main.write_text(main_source + "\n")
+          """)
+              main.write_text("\n".join(line[10:] if line.startswith("          ") else line for line in main.read_text().splitlines()) + "\n")
 
-          print("All known V36.5 source compatibility repairs applied, including Android 13-safe startup.")
-
+          print("Source repairs applied; MainActivity reduced to a clean Capacitor launcher.")
           PY
 
       - name: Install web dependencies
@@ -222,6 +159,22 @@ jobs:
         run: |
           cd "$PROJECT_DIR"
           npx cap sync android
+
+      - name: Disable incompatible speech plugin for startup test
+        shell: bash
+        run: |
+          set -e
+          cd "$PROJECT_DIR"
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          p = Path("android/app/src/main/assets/capacitor.plugins.json")
+          data = json.loads(p.read_text())
+          data = [x for x in data if x.get("pkg") != "@capacitor-community/speech-recognition"]
+          p.write_text(json.dumps(data, indent=2) + "\n")
+          print("Remaining auto-loaded Capacitor plugins:")
+          print(json.dumps(data, indent=2))
+          PY
 
       - name: Install Gradle 8.13
         shell: bash
