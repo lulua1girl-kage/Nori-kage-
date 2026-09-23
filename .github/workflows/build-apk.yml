@@ -40,7 +40,7 @@ jobs:
           SDKMANAGER="$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager"
           if [ ! -x "$SDKMANAGER" ]; then SDKMANAGER="$ANDROID_HOME/cmdline-tools/16.0/bin/sdkmanager"; fi
           yes | "$SDKMANAGER" --licenses >/dev/null || true
-          "$SDKMANAGER" platform-tools
+          "$SDKMANAGER" platform-tools "platforms;android-36" "build-tools;36.0.0"
 
       - name: Set up Node
         uses: actions/setup-node@v5
@@ -148,6 +148,18 @@ jobs:
           print("Source repairs applied; MainActivity reduced to a clean Capacitor launcher.")
           PY
 
+      - name: Apply production admission gate
+        shell: bash
+        run: |
+          set -e
+          test -f nori-patches/admission-gate-v2.js
+          cp nori-patches/admission-gate-v2.js "$PROJECT_DIR/www/nori-auth-gate-v1.js"
+          node --check "$PROJECT_DIR/www/nori-auth-gate-v1.js"
+          grep -q "danatbayu@gmail.com" "$PROJECT_DIR/www/nori-auth-gate-v1.js"
+          grep -q "mirasutton58@gmail.com" "$PROJECT_DIR/www/nori-auth-gate-v1.js"
+          grep -q "justicesteve.councle@gmail.com" "$PROJECT_DIR/www/nori-auth-gate-v1.js"
+          echo "Admission gate patched and syntax-checked."
+
       - name: Install web dependencies
         shell: bash
         run: |
@@ -199,6 +211,17 @@ jobs:
           test -n "$APK"
           cp "$APK" "$GITHUB_WORKSPACE/nori-debug.apk"
           ls -lh "$GITHUB_WORKSPACE/nori-debug.apk"
+
+      - name: Verify APK integrity and signing
+        shell: bash
+        run: |
+          set -e
+          APK="$GITHUB_WORKSPACE/nori-debug.apk"
+          APKSIGNER="$(find "$ANDROID_HOME/build-tools" -type f -name apksigner | sort -V | tail -1)"
+          test -x "$APKSIGNER"
+          "$APKSIGNER" verify --verbose "$APK"
+          unzip -t "$APK" >/dev/null
+          echo "APK signature and ZIP integrity verification passed."
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
