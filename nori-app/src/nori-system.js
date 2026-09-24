@@ -176,12 +176,12 @@ export function featureCoverage(state={}) {
   return {
     requestedRange:{from:1,to:5000},
     originalCore:510,
-    expandedLayers:[501,1001,1501,2001,2501,3001,4001,4501],
+    expandedLayers:[501,1001,1501,2001,2501,3001,4001,4501,501],
     registered:enabled,
     registryTotal:NORI_CAPABILITIES.length,
     coverageComplete:NORI_CAPABILITIES.length>=5000,
     preservedOriginalCore:true,
-    operationalLayers:["academic-engine","decision-engine","adaptive-academic","integration-intelligence","integration-intelligence-2501","deep-systems","capability-runtime","implementation-backlog-500","features-3001-3500","wake-presence-500","wake-presence-expansion-500","nori-operational","system-integration","advanced-intelligence","intelligence-expansion","intelligence-expansion-1501","intelligence-expansion-2001"],
+    operationalLayers:["academic-engine","decision-engine","adaptive-academic","integration-intelligence","integration-intelligence-2501","deep-systems","capability-runtime","implementation-backlog-500","features-3001-3500","wake-presence-500","wake-presence-expansion-500","navigation-500","navigation-expansion-500","nori-operational","system-integration","advanced-intelligence","intelligence-expansion","intelligence-expansion-1501","intelligence-expansion-2001"],
     groups:byGroup,
     stateBound:true
   };
