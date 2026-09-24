@@ -1,4 +1,4 @@
-// Nori capability registry: complete connected capability stack through feature 2500, preserving the original 510 core.
+// Nori capability registry: complete connected capability stack through feature 3000, preserving the original 510 core.
 // Each capability is addressable by the same action/decision layer; capabilities may
 // render UI, mutate local state, call the protected brain, or request native work.
 const groups = [
@@ -181,7 +181,7 @@ export function featureCoverage(state={}) {
     registryTotal:NORI_CAPABILITIES.length,
     coverageComplete:NORI_CAPABILITIES.length>=3000,
     preservedOriginalCore:true,
-    operationalLayers:["academic-engine","decision-engine","adaptive-academic","integration-intelligence","nori-operational","system-integration","advanced-intelligence","intelligence-expansion","intelligence-expansion-1501","intelligence-expansion-2001","integration-intelligence-2501"],
+    operationalLayers:["academic-engine","decision-engine","adaptive-academic","integration-intelligence","integration-intelligence-2501","nori-operational","system-integration","advanced-intelligence","intelligence-expansion","intelligence-expansion-1501","intelligence-expansion-2001"],
     groups:byGroup,
     stateBound:true
   };
