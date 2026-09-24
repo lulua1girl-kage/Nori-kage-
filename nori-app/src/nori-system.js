@@ -4,7 +4,7 @@
 const groups = [
 ["intelligence",35],["academic",45],["study",40],["materials",40],["errors",35],
 ["assessments",40],["assignments",30],["behavior",45],["recovery",25],["recognition",35],
-["voice_multimodal",35],["tools_actions",35],["android",25],["memory_sync",25],["security_audit",20],["wake_presence",500],["wake_presence_expansion",500],["advanced_intelligence",500],["integration_intelligence",500],["expansion_1001_1500",500],["expansion_1501_2000",500],["expansion_2001_2500",500]
+["voice_multimodal",35],["tools_actions",35],["android",25],["memory_sync",25],["security_audit",20],["wake_presence",500],["wake_presence_expansion",500],["advanced_intelligence",500],["integration_intelligence",500],["expansion_1001_1500",500],["expansion_1501_2000",500],["expansion_2001_2500",500],["navigation_501_1000",500]
 ];
 export const NORI_CAPABILITIES = [];
 let n=1;
