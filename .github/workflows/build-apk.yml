@@ -179,7 +179,7 @@ jobs:
 
           integrated=Path("www/nori-integrated-v31.js")
           i=integrated.read_text()
-          helper = "  async function noriMeetAsk(text){ const ss=(await g.NoriProductionAuth?.session?.())?.data?.session; if(!ss?.access_token) throw new Error('SIGN_IN_REQUIRED'); const resp=await fetch('https://qrlvkxewyoceykaquapv.supabase.co/functions/v1/nori-brain',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+ss.access_token},body:JSON.stringify({message:text,history:current.messages.slice(-12).map(m=>({role:m.role==='nori'?'assistant':'user',content:m.text})),stateSummary:{}})}); if(!resp.ok) throw new Error('Backend returned '+resp.status); const data=await resp.json(); return data.reply||null; }\\n"
+          helper = "  async function noriMeetAsk(text){ const ss=(await g.NoriProductionAuth?.session?.())?.data?.session; if(!ss?.access_token) throw new Error('SIGN_IN_REQUIRED'); const resp=await fetch('https://qrlvkxewyoceykaquapv.supabase.co/functions/v1/nori-brain',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+ss.access_token},body:JSON.stringify({message:text,history:current.messages.slice(-12).map(m=>({role:m.role==='nori'?'assistant':'user',content:m.text})),stateSummary:{}})}); if(!resp.ok) throw new Error('Backend returned '+resp.status); const data=await resp.json(); return data.reply||null; }\n"
           marker="  async function send(){"
           if marker not in i:
               raise SystemExit("Integrated send marker not found")
