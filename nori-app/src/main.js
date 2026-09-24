@@ -10,6 +10,7 @@ import {priorityQueue,buildAdaptivePlan,readiness,examRisk,nextAcademicAction} f
 import {systemIntelligence,mentorContext} from "./integration-intelligence.js";
 import {integrationSnapshot,integrationDiagnostics,closedLoopPlan} from "./integration-intelligence-2501.js";
 import {orchestrationState} from "./deep-systems.js";
+import {orchestrate,runtimeSnapshot} from "./capability-runtime.js";
 import {migrateState,systemSnapshot,recordTransition,capabilityHealth} from "./system-integration.js";
 import {ADVANCED_FEATURE_COUNT,advancedSnapshot,nextBestAction,dailyOperatingState,buildQuestionPlan,examCommand,selfDiagnostics as advancedDiagnostics} from "./advanced-intelligence.js";
 import {FEATURES_1001_1500,expansionSnapshot} from "./intelligence-expansion.js";
@@ -20,6 +21,7 @@ const db=createClient(SUPABASE_URL,KEY),STORE="nori.rebuild.v1";
 const defaults={messages:[],subjects:[],sessions:[],tasks:[],errors:[],assessments:[],plans:[],notes:[],mastery:{},behavior:[],awards:[],memory:[],events:[],syncQueue:[],points:0,phase:1,recovery:null,active:null,schemaVersion:3,settings:{voice:"en-US",deep:true}};
 const NORI_CONTRACT=connectedSystemContract();
 let S=load(),page="home",listening=false,heard="",timer=0,level=0,stream=null,audio=null,analyser=null,raf=0;
+function liveRuntime(message=""){return orchestrate(S,{message});}
 function load(){try{return migrateState({...defaults,...JSON.parse(localStorage.getItem(STORE)||"{}")})}catch{return migrateState({...defaults})}}
 function applyState(next){S={...S,...next};save();render()}
 function save(){localStorage.setItem(STORE,JSON.stringify(S))}
