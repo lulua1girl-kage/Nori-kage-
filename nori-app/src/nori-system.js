@@ -181,7 +181,7 @@ export function featureCoverage(state={}) {
     registryTotal:NORI_CAPABILITIES.length,
     coverageComplete:NORI_CAPABILITIES.length>=3000,
     preservedOriginalCore:true,
-    operationalLayers:["academic-engine","decision-engine","adaptive-academic","integration-intelligence","integration-intelligence-2501","nori-operational","system-integration","advanced-intelligence","intelligence-expansion","intelligence-expansion-1501","intelligence-expansion-2001"],
+    operationalLayers:["academic-engine","decision-engine","adaptive-academic","integration-intelligence","integration-intelligence-2501","deep-systems","capability-runtime","nori-operational","system-integration","advanced-intelligence","intelligence-expansion","intelligence-expansion-1501","intelligence-expansion-2001"],
     groups:byGroup,
     stateBound:true
   };
