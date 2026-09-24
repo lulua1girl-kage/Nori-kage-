@@ -1,0 +1,51 @@
+name: Build Nori Rebuild
+on:
+  workflow_dispatch:
+  push:
+    branches: [nori-rebuild]
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: nori-app/package.json
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: android-actions/setup-android@v3
+      - name: Install dependencies
+        working-directory: nori-app
+        run: npm install
+      - name: Build web
+        working-directory: nori-app
+        run: npm run build
+      - name: Generate Android project
+        working-directory: nori-app
+        run: npx cap add android
+      - name: Sync Android
+        working-directory: nori-app
+        run: npx cap sync android
+      - name: Pin Gradle
+        working-directory: nori-app/android
+        run: sed -i 's#distributionUrl=.*#distributionUrl=https\\://services.gradle.org/distributions/gradle-8.13-bin.zip#' gradle/wrapper/gradle-wrapper.properties
+      - name: Build debug APK
+        working-directory: nori-app/android
+        run: ./gradlew clean assembleDebug --no-daemon --stacktrace
+      - name: Verify APK
+        working-directory: nori-app/android
+        run: |
+          APK=$(find app/build/outputs/apk/debug -name '*.apk' | head -1)
+          test -n "$APK"
+          "$ANDROID_HOME/build-tools/36.0.0/apksigner" verify --verbose "$APK"
+          unzip -t "$APK" >/dev/null
+      - uses: actions/upload-artifact@v4
+        with:
+          name: nori-rebuild-debug
+          path: nori-app/android/app/build/outputs/apk/debug/*.apk
