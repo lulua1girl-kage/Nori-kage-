@@ -3,6 +3,8 @@ on:
   workflow_dispatch:
   push:
     branches: [nori-rebuild]
+  pull_request:
+    branches: [main]
 jobs:
   build:
     runs-on: ubuntu-latest
