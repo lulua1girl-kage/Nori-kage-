@@ -2,8 +2,8 @@ import {createClient} from "@supabase/supabase-js";
 import {LocalNotifications} from "@capacitor/local-notifications";
 import {SpeechRecognition} from "@capacitor-community/speech-recognition";
 import "./style.css";
-const URL="https://qrlvkxewyoceykaquapv.supabase.co",KEY="sb_publishable_3QSgkXgNWRa82Z2ID6n7Ag_QdvmH92_",BRAIN=URL+"/functions/v1/nori-brain";
-const db=createClient(URL,KEY),STORE="nori.rebuild.v1";
+const SUPABASE_URL="https://qrlvkxewyoceykaquapv.supabase.co",KEY="sb_publishable_3QSgkXgNWRa82Z2ID6n7Ag_QdvmH92_",BRAIN=SUPABASE_URL+"/functions/v1/nori-brain";
+const db=createClient(SUPABASE_URL,KEY),STORE="nori.rebuild.v1";
 const defaults={messages:[],subjects:[],sessions:[],tasks:[],errors:[],assessments:[],plans:[],notes:[],points:0,phase:1,recovery:null,active:null,settings:{voice:"en-US",deep:true}};
 let S=load(),page="home",listening=false,heard="",timer=0,level=0,stream=null,audio=null,analyser=null,raf=0;
 function load(){try{return {...defaults,...JSON.parse(localStorage.getItem(STORE)||"{}")}}catch{return {...defaults}}}
