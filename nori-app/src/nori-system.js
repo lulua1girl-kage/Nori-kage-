@@ -4,7 +4,7 @@
 const groups = [
 ["intelligence",35],["academic",45],["study",40],["materials",40],["errors",35],
 ["assessments",40],["assignments",30],["behavior",45],["recovery",25],["recognition",35],
-["voice_multimodal",35],["tools_actions",35],["android",25],["memory_sync",25],["security_audit",20],["wake_presence",500],["advanced_intelligence",500],["integration_intelligence",500],["expansion_1001_1500",500],["expansion_1501_2000",500],["expansion_2001_2500",500]
+["voice_multimodal",35],["tools_actions",35],["android",25],["memory_sync",25],["security_audit",20],["wake_presence",500],["wake_presence_expansion",500],["advanced_intelligence",500],["integration_intelligence",500],["expansion_1001_1500",500],["expansion_1501_2000",500],["expansion_2001_2500",500]
 ];
 export const NORI_CAPABILITIES = [];
 let n=1;
@@ -174,14 +174,14 @@ export function featureCoverage(state={}) {
   const byGroup={};
   for(const x of NORI_CAPABILITIES) byGroup[x.group]=(byGroup[x.group]||0)+1;
   return {
-    requestedRange:{from:1,to:3500},
+    requestedRange:{from:1,to:5000},
     originalCore:510,
-    expandedLayers:[501,1001,1501,2001,2501,3001],
+    expandedLayers:[501,1001,1501,2001,2501,3001,4001,4501],
     registered:enabled,
     registryTotal:NORI_CAPABILITIES.length,
-    coverageComplete:NORI_CAPABILITIES.length>=3500,
+    coverageComplete:NORI_CAPABILITIES.length>=5000,
     preservedOriginalCore:true,
-    operationalLayers:["academic-engine","decision-engine","adaptive-academic","integration-intelligence","integration-intelligence-2501","deep-systems","capability-runtime","implementation-backlog-500","features-3001-3500","nori-operational","system-integration","advanced-intelligence","intelligence-expansion","intelligence-expansion-1501","intelligence-expansion-2001"],
+    operationalLayers:["academic-engine","decision-engine","adaptive-academic","integration-intelligence","integration-intelligence-2501","deep-systems","capability-runtime","implementation-backlog-500","features-3001-3500","wake-presence-500","wake-presence-expansion-500","nori-operational","system-integration","advanced-intelligence","intelligence-expansion","intelligence-expansion-1501","intelligence-expansion-2001"],
     groups:byGroup,
     stateBound:true
   };
