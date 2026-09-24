@@ -124,3 +124,46 @@ export function systemHealth(state={}) {
     state
   };
 }
+
+// Next capability layer: operational orchestration contracts.
+// These are intentionally small functions used by the UI/brain instead of dead feature labels.
+export function buildStudySession(state, request={}) {
+  const move=nextStudyMove(state);
+  return {
+    subject: request.subject || move.subject || (state.subjects||[])[0]?.name || "Current subject",
+    topic: request.topic || move.topic || null,
+    objective: request.objective || "Make measurable progress and verify understanding",
+    minutes: Math.max(10, Number(request.minutes || state.availableTime || 45)),
+    mode: request.mode || "adaptive",
+    evidenceRequired: true,
+    followUp: "verify"
+  };
+}
+export function buildMentorLoop(state, request={}) {
+  const session=buildStudySession(state,request);
+  return {
+    session,
+    stages:["diagnose","teach","attempt","feedback","repair","verify"],
+    stopCondition:"verified_or_method_changed",
+    antiBusywork:true
+  };
+}
+export function routeAction(message,state={}) {
+  const intent=noriIntent(message,state);
+  const local=executeLocalIntent(intent,message,state);
+  if(local) return {intent,action:local,mentor:mentorDirective(intent,state)};
+  if(intent.learning) return {intent,action:buildMentorLoop(state),mentor:mentorDirective(intent,state)};
+  if(intent.planning) return {intent,action:buildStudySession(state),mentor:mentorDirective(intent,state)};
+  return {intent,action:{type:"conversation",requiresProvider:true},mentor:mentorDirective(intent,state)};
+}
+export function connectedSystemContract() {
+  return {
+    chain:["conversation","context","analysis","decision","action","evidence","tracking","memory","adaptation"],
+    navigation:["home","study","tracker","recovery","profile"],
+    chatIsFeature:true,
+    providerRequiredForAdaptiveReasoning:true,
+    deterministicAuthority:["behavior","recovery","recognition","integrity"],
+    offlineFallback:true,
+    antiBusywork:true
+  };
+}
