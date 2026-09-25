@@ -51,3 +51,5 @@ jobs:
         with:
           name: nori-rebuild-debug
           path: nori-app/android/app/build/outputs/apk/debug/*.apk
+
+# Build verification trigger: compile and verify the current nori-rebuild tree.
