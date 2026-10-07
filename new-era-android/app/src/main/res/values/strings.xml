@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">New Era</string>
+    <string name="accessibility_description">New Era uses a user-configured accessibility service to detect when a blocked app becomes visible during an active focus session and show a blocking layer. It does not read screen content.</string>
+</resources>
